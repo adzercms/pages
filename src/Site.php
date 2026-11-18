@@ -9,7 +9,6 @@ use AdzerCMS\Contracts\Setting\Type;
 use AdzerCMS\Core\Seo\Breadcrumbs;
 use AdzerCMS\Core\Setting\Brand;
 use AdzerCMS\Core\Setting\Values;
-use AdzerCMS\Core\Text\TextValues;
 use AdzerCMS\Pages\Controller\PageController;
 use AdzerCMS\Pages\Entity\Page;
 use AdzerCMS\Pages\Repository\PageBlockRepository;
@@ -26,11 +25,10 @@ final readonly class Site
         private UrlGeneratorInterface $urls,
         private Pictures $pictures,
         private Breadcrumbs $breadcrumbs,
-        private TextValues $values,
     ) {
     }
 
-    /** @return array{title: string, description: string, heading: ?string, tabs: list<array{label: string, href: string, active: bool}>, blocks: list<array{template: string, key: string, values: array<string, mixed>, data: array<string, mixed>, level: int}>, schema: list<array<string, mixed>>} */
+    /** @return array{heading: ?string, tabs: list<array{label: string, href: string, active: bool}>, blocks: list<array{template: string, key: string, values: array<string, mixed>, data: array<string, mixed>, level: int}>, schema: list<array<string, mixed>>} */
     public function view(Page $page): array
     {
         $blocks = [];
@@ -54,14 +52,13 @@ final readonly class Site
             $schema[] = $type->schema($stored);
         }
 
-        $title = $this->title($page);
-        $heading = $title;
+        $heading = $page->getTitle();
         if ([] !== $blocks && '' !== ($blocks[0]['values'][Block::TITLE] ?? '')) {
             $blocks[0]['level'] = 1;
             $heading = null;
         }
 
-        return ['title' => $title, 'description' => $this->values->fill($page->getDescription() ?? ''), 'heading' => $heading, 'tabs' => $this->tabs($page), 'blocks' => $blocks, 'schema' => array_values(array_filter($schema))];
+        return ['heading' => $heading, 'tabs' => $this->tabs($page), 'blocks' => $blocks, 'schema' => array_values(array_filter($schema))];
     }
 
     /** @return list<array{label: string, href: string, active: bool}> */
@@ -78,7 +75,7 @@ final readonly class Site
         }
 
         return array_map(fn (Page $one): array => [
-            'label' => $this->label($one),
+            'label' => $one->menuLabel(),
             'href' => $this->url($one, UrlGeneratorInterface::ABSOLUTE_PATH),
             'active' => $one === $page,
         ], $section);
@@ -88,7 +85,7 @@ final readonly class Site
     private function page(Page $page): array
     {
         if (Page::ROOT !== $page->getPath()) {
-            return [Breadcrumbs::schema($this->breadcrumbs->trail([['name' => $this->title($page), 'url' => $this->url($page)]]))];
+            return [Breadcrumbs::schema($this->breadcrumbs->trail([['name' => $page->getTitle(), 'url' => $this->url($page)]]))];
         }
         $root = $this->urls->generate(PageController::ROOT, [], UrlGeneratorInterface::ABSOLUTE_URL);
 
@@ -120,16 +117,6 @@ final readonly class Site
     private function picture(string $name): ?array
     {
         return '' === $name ? null : $this->pictures->shown($name);
-    }
-
-    public function title(Page $page): string
-    {
-        return $this->values->fill($page->getTitle());
-    }
-
-    public function label(Page $page): string
-    {
-        return $page->getMenuLabel() ?? $this->title($page);
     }
 
     public function url(Page $page, int $reference = UrlGeneratorInterface::ABSOLUTE_URL): string

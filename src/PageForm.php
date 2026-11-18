@@ -6,7 +6,6 @@ namespace AdzerCMS\Pages;
 
 use AdzerCMS\Contracts\Refusal;
 use AdzerCMS\Core\Site\Hosts;
-use AdzerCMS\Core\Text\TextValues;
 use AdzerCMS\Core\Ui\Order;
 use AdzerCMS\Pages\Controller\PageController;
 use AdzerCMS\Pages\Entity\Page;
@@ -41,7 +40,6 @@ final readonly class PageForm
         private RouterInterface $router,
         private Hosts $hosts,
         private EntityManagerInterface $em,
-        private TextValues $values,
     ) {
     }
 
@@ -52,7 +50,7 @@ final readonly class PageForm
      */
     public function add(InputBag $input): Page|array
     {
-        $title = $this->title($input);
+        $title = self::title($input);
         $path = $this->path($input, null);
         if ($title instanceof Refusal || $path instanceof Refusal) {
             return self::refusals([self::TITLE => $title, self::PATH => $path]);
@@ -74,15 +72,13 @@ final readonly class PageForm
      */
     public function save(Page $page, InputBag $input): array
     {
-        $title = $this->title($input);
+        $title = self::title($input);
         $path = $this->path($input, $page);
         $former = $path instanceof Refusal ? [] : $this->former($input, $page, $path);
-        $description = trim($input->getString(self::DESCRIPTION));
-        $unknown = $this->values->refusal($description, t('pages.field.description'));
         $label = trim($input->getString(self::MENU_LABEL));
         $long = mb_strlen($label) > Page::MENU ? new Refusal(t('pages.refusal.menu_label', ['limit' => Page::MENU])) : null;
-        if ($title instanceof Refusal || $path instanceof Refusal || $former instanceof Refusal || null !== $unknown || null !== $long) {
-            return self::refusals([self::TITLE => $title, self::PATH => $path, self::FORMER => $former instanceof Refusal ? $former : null, self::DESCRIPTION => $unknown, self::MENU_LABEL => $long]);
+        if ($title instanceof Refusal || $path instanceof Refusal || $former instanceof Refusal || null !== $long) {
+            return self::refusals([self::TITLE => $title, self::PATH => $path, self::FORMER => $former instanceof Refusal ? $former : null, self::MENU_LABEL => $long]);
         }
 
         if ($path !== $page->getPath()) {
@@ -90,6 +86,7 @@ final readonly class PageForm
             $this->release($path);
         }
         $this->keep($page, $former);
+        $description = trim($input->getString(self::DESCRIPTION));
         $page->edit(
             $title,
             $path,
@@ -133,14 +130,11 @@ final readonly class PageForm
     }
 
     /** @param InputBag<string> $input */
-    private function title(InputBag $input): string|Refusal
+    private static function title(InputBag $input): string|Refusal
     {
         $title = trim($input->getString(self::TITLE));
-        if ('' === $title || mb_strlen($title) > Page::TITLE) {
-            return new Refusal(t('pages.refusal.title', ['limit' => Page::TITLE]));
-        }
 
-        return $this->values->refusal($title, t('pages.field.title')) ?? $title;
+        return '' === $title || mb_strlen($title) > Page::TITLE ? new Refusal(t('pages.refusal.title', ['limit' => Page::TITLE])) : $title;
     }
 
     /** @param InputBag<string> $input */
