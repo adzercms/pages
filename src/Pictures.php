@@ -6,66 +6,66 @@ namespace AdzerCMS\Pages;
 
 use AdzerCMS\Core\Photo\Photos;
 use AdzerCMS\Pages\Controller\PageController;
-use Symfony\Component\HttpFoundation\File\UploadedFile;
+use AdzerCMS\Pages\Repository\PageBlockRepository;
+use Symfony\Component\HttpFoundation\File\File;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 
-final readonly class Pictures
+use function Symfony\Component\Clock\now;
+
+final readonly class Pictures implements Album
 {
     private const PLACE = 'pages';
     private const SIDE = 1920;
+    private const TERM = '-1 day';
+
+    private PhotoAlbum $album;
 
     public function __construct(
-        private Photos $photos,
-        private UrlGeneratorInterface $urls,
+        Photos $photos,
+        UrlGeneratorInterface $urls,
+        PageBlockRepository $blocks,
     ) {
+        $this->album = new PhotoAlbum(
+            $photos,
+            self::PLACE,
+            self::SIDE,
+            static fn (string $name): string => $urls->generate(PageController::PICTURE, ['file' => $name]),
+            static fn (): array => PhotoAlbum::names(array_merge([], ...array_map(array_values(...), $blocks->values()))),
+        );
     }
 
-    public function store(UploadedFile $picture): string
+    public function store(File $picture): string
     {
-        return $this->photos->store($picture, self::PLACE, self::SIDE);
+        return $this->album->store($picture);
     }
 
     public function path(string $name): ?string
     {
-        return $this->photos->path(self::PLACE, $name);
+        return $this->album->path($name);
     }
 
-    /** @return array{src: string, width: int, height: int}|null */
     public function shown(string $name): ?array
     {
-        $path = $this->path($name);
-        $size = null === $path ? false : getimagesize($path);
-
-        return false === $size ? null : ['src' => $this->urls->generate(PageController::PICTURE, ['file' => $name]), 'width' => $size[0], 'height' => $size[1]];
+        return $this->album->shown($name);
     }
 
-    /** @param array<array-key, string> $values */
+    public function listed(): array
+    {
+        return $this->album->listed();
+    }
+
+    public function entry(string $name): array
+    {
+        return $this->album->entry($name);
+    }
+
     public function drop(array $values): void
     {
-        $this->photos->drop(self::PLACE, self::names($values));
+        $this->album->drop($values);
     }
 
-    /**
-     * @param array<array-key, string> $values
-     *
-     * @return list<string>
-     */
-    public static function names(array $values): array
+    public function sweep(): int
     {
-        $names = [];
-        foreach ($values as $value) {
-            $rows = json_validate($value) ? json_decode($value, true) : null;
-            if (\is_array($rows)) {
-                array_walk_recursive($rows, static function (mixed $cell) use (&$names): void {
-                    if (\is_string($cell)) {
-                        $names[] = $cell;
-                    }
-                });
-            } else {
-                $names[] = $value;
-            }
-        }
-
-        return $names;
+        return $this->album->sweep(now()->modify(self::TERM)->getTimestamp());
     }
 }

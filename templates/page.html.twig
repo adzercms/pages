@@ -5,6 +5,7 @@
 {% block meta %}
     {% include '@Theme/_seo.html.twig' with {title: view.title, description: view.description} only %}
     {% include '@Theme/_schema.html.twig' with {schema: view.schema} only %}
+    {% if view.style %}<style>{{ view.style }}</style>{% endif %}
 {% endblock %}
 
 {% block page %}
@@ -13,5 +14,5 @@
             {% block content %}{% if tabs %}{% include '@Theme/_tabs.html.twig' with {tabs: tabs} only %}{% endif %}{% endblock %}
         {% endembed %}
     {% endif %}
-    {% for block in view.blocks %}{% include block.template with block only %}{% endfor %}
+    {% block blocks %}{% for block in view.blocks %}{% include block.template with block only %}{% endfor %}{% endblock %}
 {% endblock %}
